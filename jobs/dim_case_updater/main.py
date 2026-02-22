@@ -14,7 +14,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--env", default=os.getenv("PIPELINE_ENV", "dev"), choices=["dev", "prod"])
     parser.add_argument("--project-id", default=os.getenv("PROJECT_ID", "<PROJECT_ID>"))
     parser.add_argument("--dataset-ops", default=os.getenv("DATASET_OPS", "<DATASET_OPS>"))
-    parser.add_argument("--dataset-analytics", default=os.getenv("DATASET_ANALYTICS", "<DATASET_ANALYTICS>"))
+    parser.add_argument(
+        "--dataset-analytics", default=os.getenv("DATASET_ANALYTICS", "<DATASET_ANALYTICS>")
+    )
     parser.add_argument("--location", default=os.getenv("BQ_REGION", "us-east4"))
     parser.add_argument(
         "--merge-script-path",
@@ -39,9 +41,7 @@ def fetch_active_tenants(
     """
     job = client.query(
         sql,
-        job_config=QueryJobConfig(
-            query_parameters=[ScalarQueryParameter("env", "STRING", env)]
-        ),
+        job_config=QueryJobConfig(query_parameters=[ScalarQueryParameter("env", "STRING", env)]),
     )
     return [row["tenant_id"] for row in job.result()]
 

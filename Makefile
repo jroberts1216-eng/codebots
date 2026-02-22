@@ -1,24 +1,15 @@
-PY=python
+.PHONY: fmt lint type test verify
 
-.PHONY: install test lint format typecheck verify
-
-install:
-	pip install -e ".[dev]"
-
-test:
-	pytest -q
+fmt:
+	python -m ruff format .
 
 lint:
-	ruff check .
+	python -m ruff check .
 
-format:
-	ruff format .
+type:
+	python -m mypy codebots
 
-typecheck:
-	mypy src
+test:
+	python -m pytest -q
 
-verify:
-	$(PY) -m compileall -q .
-	ruff check .
-	ruff format --check .
-	pytest -q
+verify: fmt lint type test

@@ -5,7 +5,14 @@ from pathlib import Path
 from codebots.agents.base import AgentContext
 from codebots.agents.registry import AgentPack, DEFAULT_AGENT_PACK
 from codebots.config import load_config
-from codebots.core.artifacts import RunPaths, dump_json, dump_model, new_run_id, persist_config, work_item_dir
+from codebots.core.artifacts import (
+    RunPaths,
+    dump_json,
+    dump_model,
+    new_run_id,
+    persist_config,
+    work_item_dir,
+)
 from codebots.core.dag import topo_sort
 from codebots.core.events import Event, EventLogger
 from codebots.core.models import Plan, Role, VerifyResult, WorkItem, WorkOutput
@@ -15,10 +22,11 @@ from codebots.llm.factory import create_llm
 
 
 def _execute_item(ctx: AgentContext, pack: AgentPack, item: WorkItem) -> WorkOutput:
-    agent = pack.for_role(item.owner)
     # Planning roles do not "execute" code changes.
     if item.owner in {Role.product_manager, Role.architect, Role.program_manager}:
-        return WorkOutput(work_item_id=item.id, summary="No-op (planning role).", notes=["Skipped execution."])
+        return WorkOutput(
+            work_item_id=item.id, summary="No-op (planning role).", notes=["Skipped execution."]
+        )
 
     # Execution roles use role-specific execute methods.
     if item.owner == Role.platform_engineer:
@@ -33,7 +41,9 @@ def _execute_item(ctx: AgentContext, pack: AgentPack, item: WorkItem) -> WorkOut
         return pack.reviewer.execute(ctx, item)
 
     # Fallback (should not happen due to enum)
-    return WorkOutput(work_item_id=item.id, summary="No-op (unknown role).", notes=["Skipped execution."])
+    return WorkOutput(
+        work_item_id=item.id, summary="No-op (unknown role).", notes=["Skipped execution."]
+    )
 
 
 def run_build(
@@ -48,7 +58,9 @@ def run_build(
     persist_config(run_paths, config)
 
     events = EventLogger(run_paths.events_path)
-    events.emit(Event.now("run.start", goal=goal, repo=str(repo_path), workflow="build", apply=apply))
+    events.emit(
+        Event.now("run.start", goal=goal, repo=str(repo_path), workflow="build", apply=apply)
+    )
 
     llm = create_llm(config)
     ctx = AgentContext(repo_path=repo_path, config=config, llm=llm, events=events)
@@ -57,7 +69,9 @@ def run_build(
     # --- plan ---
     prd = pack.product_manager.create_prd(ctx, goal=goal)
     architecture = pack.architect.create_architecture(ctx, prd=prd)
-    work_dag = pack.program_manager.create_work_dag(ctx, goal=goal, prd=prd, architecture=architecture)
+    work_dag = pack.program_manager.create_work_dag(
+        ctx, goal=goal, prd=prd, architecture=architecture
+    )
     plan = Plan(goal=goal, prd=prd, architecture=architecture, work_items=work_dag.work_items)
     dump_model(run_paths.plan_path, plan)
     events.emit(Event.now("plan.complete", work_items=len(plan.work_items)))
@@ -70,7 +84,11 @@ def run_build(
         item_dir = work_item_dir(run_paths, item.id)
         dump_model(item_dir / "input.json", item)
 
-        events.emit(Event.now("work_item.start", work_item_id=item.id, owner=item.owner.value, title=item.title))
+        events.emit(
+            Event.now(
+                "work_item.start", work_item_id=item.id, owner=item.owner.value, title=item.title
+            )
+        )
         out = _execute_item(ctx, pack, item)
         dump_model(item_dir / "output.json", out)
 
@@ -118,12 +136,17 @@ def run_build(
         dump_model(item_dir / "output.json", out)
         if apply and out.changes:
             written = apply_changes(repo_path, out.changes)
-            dump_json(item_dir / "applied_changes.json", {"paths": [str(p.relative_to(repo_path)) for p in written]})
+            dump_json(
+                item_dir / "applied_changes.json",
+                {"paths": [str(p.relative_to(repo_path)) for p in written]},
+            )
         else:
             dump_json(item_dir / "applied_changes.json", {"paths": [], "dry_run": True})
 
         verify = run_verify(repo_path, config.verify.commands)
-        (run_paths.run_dir / f"verify_fix{cycles}.log").write_text(verify.combined_output, encoding="utf-8")
+        (run_paths.run_dir / f"verify_fix{cycles}.log").write_text(
+            verify.combined_output, encoding="utf-8"
+        )
         events.emit(Event.now("verify.complete", ok=verify.ok, cycle=cycles))
 
     events.emit(Event.now("run.end", workflow="build", ok=verify.ok))

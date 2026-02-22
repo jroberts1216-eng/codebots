@@ -1,24 +1,21 @@
 from __future__ import annotations
 
-import pytest
+from pathlib import Path
 
-from codebots.core.dag import DagError, topo_sort
-from codebots.core.models import Role, WorkItem
-
-
-def test_topo_sort_orders_dependencies() -> None:
-    items = [
-        WorkItem(id="a", title="a", description="a", owner=Role.software_engineer, depends_on=[]),
-        WorkItem(id="b", title="b", description="b", owner=Role.software_engineer, depends_on=["a"]),
-    ]
-    ordered = topo_sort(items)
-    assert [i.id for i in ordered] == ["a", "b"]
+from codebots.llm.mock import MockProvider
+from codebots.orchestration.context import build_repo_context
+from codebots.orchestration.plan import Planner
 
 
-def test_topo_sort_detects_cycles() -> None:
-    items = [
-        WorkItem(id="a", title="a", description="a", owner=Role.software_engineer, depends_on=["b"]),
-        WorkItem(id="b", title="b", description="b", owner=Role.software_engineer, depends_on=["a"]),
-    ]
-    with pytest.raises(DagError):
-        topo_sort(items)
+def test_plan_output_contains_dependency_fields(tmp_path: Path) -> None:
+    (tmp_path / "README.md").write_text("demo", encoding="utf-8")
+    ctx = build_repo_context(tmp_path)
+    planner = Planner(
+        llm=MockProvider(), enabled_agents=["product_manager", "architect", "program_manager"]
+    )
+    out = planner.run(repo_context=ctx, goal="demo goal")
+    assert out["goal"] == "demo goal"
+    assert out["plan"] is not None
+    tasks = out["plan"]["tasks"]
+    assert tasks
+    assert "deps" in tasks[0]

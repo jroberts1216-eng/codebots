@@ -23,7 +23,7 @@
    - Runs a configured list of repo commands (e.g., `ruff`, `pytest`, `tofu validate`).
    - If verification fails, QA + SWE can propose fix work items (bounded loop).
 
-## What improves on SWE-AF-style repos
+## What this architecture improves
 
 - **Strict schemas**: every agent output is validated (Pydantic). Fail-fast vs. downstream confusion.
 - **First-class verification**: verify commands are required in config and run consistently.

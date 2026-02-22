@@ -33,5 +33,7 @@ class Agent(Generic[T]):
     def run(self, ctx: AgentContext, prompt: str, model_type: type[T]) -> T:
         ctx.events.emit(Event.now("agent.start", role=self.role, name=self.name))
         out = ctx.llm.complete_model(model_type, prompt)
-        ctx.events.emit(Event.now("agent.end", role=self.role, name=self.name, model=model_type.__name__))
+        ctx.events.emit(
+            Event.now("agent.end", role=self.role, name=self.name, model=model_type.__name__)
+        )
         return out

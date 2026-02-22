@@ -1,118 +1,90 @@
 # codebots
 
-A multi-agent codebase planning + execution framework for building and evolving real repositories.
+`codebots` is a **drop-in**, **local-first** multi-agent CLI that can:
 
-`codebots` is designed to improve on SWE-AF-style pipelines by being:
+- **Review** any git repository with an arbitrary number of specialized agents
+- **Plan** work (PRD + architecture + dependency-aware task graph)
+- **Execute** tasks using tool-driven agents (read/search/write/apply patches)
+- **Verify** with your repo’s real commands, then run a bounded **fix loop**
 
-- **Repo-verifiable by default**: every workflow has a configurable, deterministic `verify` step.
-- **Strongly typed**: agents produce structured outputs (Pydantic models) so downstream steps are reliable.
-- **Role-based**: Product Manager, Program Manager, Platform Engineer, SWE, QA, Security, Reviewer.
-- **Testable**: includes a mock LLM provider so unit tests run without external credentials.
-- **Pluggable**: swap LLM providers and agent packs without rewriting orchestration.
+It is general-purpose: use it for backend work, frontend work, infra work, data work, or integration work
+(e.g., “connect invoice data to QuickBooks”) as long as the work can be represented as repo changes.
 
-The repository you linked is currently empty. This scaffold is intended to be committed into that repository as the initial project. citeturn1view0
-
-## Quickstart
-
-### 1) Install (local development)
+## Install (developer mode)
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+pip install -U pip
 pip install -e ".[dev]"
 ```
 
-### 2) Run the unit tests
+## Use against any repo
+
+From anywhere:
 
 ```bash
-pytest -q
+codebots agents
+codebots review --repo /path/to/repo
+codebots plan   --repo /path/to/repo --goal "..."
+codebots run    --repo /path/to/repo --goal "..." --apply
 ```
 
-### 3) Create a plan
+Artifacts are written under:
 
-```bash
-codebots plan --repo . --goal "Scaffold a CLI tool with CI and basic docs"
-```
-
-Artifacts will be written under `.codebots/runs/<run-id>/`.
-
-### 4) Run a full build
-
-```bash
-codebots build --repo . --goal "Add a new workflow: plan -> execute -> verify"
-```
-
-By default, builds use the **mock** LLM provider (safe + deterministic).  
-To use a real provider, configure `.codebots/config.yaml` (see below).
+- `<repo>/.codebots/artifacts/<run-id>/`
 
 ## Configuration
 
-Create `.codebots/config.yaml`:
+Create `<repo>/.codebots/config.toml`:
 
-```yaml
-llm:
-  provider: mock  # mock | openai_compat | custom
-  model: default
-  base_url: https://api.openai.com  # only used for openai_compat
-verify:
-  commands:
-    - python -m compileall -q .
-    - ruff check .
-    - ruff format --check .
-    - pytest -q
-workflows:
-  max_fix_cycles: 1
-  max_retries_per_item: 2
+```toml
+[llm]
+provider = "openai_compat"
+base_url = "https://api.openai.com"
+model = "gpt-4.1-mini"
+api_key_env = "CODEBOTS_API_KEY"
+
+[budgets]
+max_input_tokens = 200000
+max_output_tokens = 80000
+max_cost_usd = 25.0
+
+[verify]
+commands = [
+  "python -m compileall -q .",
+  "pytest -q"
+]
+# Allowlist for commands codebots may execute (recommended)
+allow = ["python", "pytest", "ruff", "mypy", "npm", "pnpm", "yarn", "go", "cargo", "make", "terraform", "tofu"]
+
+[agents]
+# Enable/disable any built-in agents
+enabled = ["repo_overview", "build_system", "quality", "security", "dependencies", "docs",
+           "product_manager", "architect", "program_manager",
+           "platform_engineer", "software_engineer", "qa_engineer", "reviewer"]
+parallel_reviews = true
 ```
 
-## Concepts
+Then:
 
-- **Plan**: PRD + Architecture + Work DAG (work items with dependencies)
-- **Execute**: run work items in topological order using role-specific agents
-- **Verify**: run repo commands; if they fail, QA + SWE propose fixes (optional loop)
+```bash
+export CODEBOTS_API_KEY="..."
+codebots run --repo /path/to/repo --goal "..."
+```
 
-See `docs/architecture.md` and `docs/agents.md`.
+## Agent model
 
-## GCP DIM_CASE Pipeline Scaffold
+Agents are grouped into categories:
 
-This repo now includes a config-driven scaffold for a daily incremental CDC pipeline on GCP:
+- **Review** agents: read/search only; produce findings and recommendations.
+- **Planning** agents: produce PRD, architecture, and a dependency-aware plan.
+- **Execution** agents: propose edits (patches) and apply them; then verify/fix.
 
-- Source: CDC Avro files in GCS (dev/prod buckets).
-- Landing/query: BigLake external tables in BigQuery.
-- Current-state logic: `vw_cases_current_<env>` views.
-- Consolidation: Type 1 MERGE into native `dim_case`.
-- Orchestration: Cloud Run Job (per-tenant MERGE) + Cloud Scheduler (daily).
+Built-ins are rule-based by default; enable the LLM provider to generate richer plans and edits.
 
-### Layout
+## Safety defaults
 
-- Terraform: `terraform/`
-- SQL:
-  - `sql/tables/ops_stream_config.sql`
-  - `sql/tables/ops_pipeline_state.sql`
-  - `sql/tables/dim_case.sql`
-  - `sql/external_tables/ext_cases_avro_dev.sql`
-  - `sql/external_tables/ext_cases_avro_prod.sql`
-  - `sql/views/vw_cases_current_dev.sql`
-  - `sql/views/vw_cases_current_prod.sql`
-  - `sql/merges/merge_dim_case.sql`
-- Cloud Run job:
-  - `jobs/dim_case_updater/main.py`
-  - `jobs/dim_case_updater/Dockerfile`
-  - `jobs/dim_case_updater/requirements.txt`
-
-### Placeholder Variables
-
-Use these placeholders in SQL/Terraform and replace for each environment:
-
-- `<PROJECT_ID>`
-- `<DATASET_ANALYTICS>`
-- `<DATASET_OPS>`
-- `<REGION>`
-- `<CONNECTION_ID>`
-
-### Notes
-
-- `stream_config` is the single control plane for dev/prod tenant activation.
-- The merge script computes deterministic `case_key` as `ABS(FARM_FINGERPRINT(CONCAT(tenant_id,'|',case_id)))`.
-- TODO markers are included where source field names or bucket/path conventions may differ.
-- Docker build should be run from repo root so `sql/merges/merge_dim_case.sql` is copied into the image.
+- Only reads/writes inside `--repo`.
+- Patch application is done via unified diffs.
+- Command execution is allowlisted (off by default unless configured).

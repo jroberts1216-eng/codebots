@@ -24,6 +24,8 @@ class EventLogger:
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
     def emit(self, event: Event) -> None:
-        line = json.dumps({"ts": event.ts, "type": event.type, "payload": event.payload}, ensure_ascii=False)
+        line = json.dumps(
+            {"ts": event.ts, "type": event.type, "payload": event.payload}, ensure_ascii=False
+        )
         with self._path.open("a", encoding="utf-8") as f:
             f.write(line + "\n")

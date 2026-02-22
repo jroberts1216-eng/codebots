@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from pydantic import BaseModel
 
@@ -37,4 +37,6 @@ class StructuredLLM:
         try:
             return model_type.model_validate_json(raw)
         except Exception as e:  # noqa: BLE001
-            raise LLMError(f"Failed to parse model {model_type.__name__} from LLM output. Raw:\n{raw}") from e
+            raise LLMError(
+                f"Failed to parse model {model_type.__name__} from LLM output. Raw:\n{raw}"
+            ) from e

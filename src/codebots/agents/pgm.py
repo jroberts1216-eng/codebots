@@ -8,7 +8,9 @@ class ProgramManagerAgent(Agent[WorkDAG]):
     role = Role.program_manager.value
     name = "program_manager"
 
-    def create_work_dag(self, ctx: AgentContext, goal: str, prd: PRD, architecture: Architecture) -> WorkDAG:
+    def create_work_dag(
+        self, ctx: AgentContext, goal: str, prd: PRD, architecture: Architecture
+    ) -> WorkDAG:
         prompt = f"""You are a program manager. Break work into an executable dependency graph.
 
 SCHEMA:WORK_DAG
