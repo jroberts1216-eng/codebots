@@ -1,0 +1,16 @@
+llm:
+  provider: mock  # set to openai_compat for a real provider  # mock | openai_compat | custom
+  model: default
+  base_url: https://api.openai.com
+  api_key_env: CODEBOTS_API_KEY
+
+verify:
+  commands:
+    - python -m compileall -q .
+    - ruff check .
+    - ruff format --check .
+    - pytest -q
+
+workflows:
+  max_fix_cycles: 1
+  max_retries_per_item: 2

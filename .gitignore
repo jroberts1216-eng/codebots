@@ -1,0 +1,11 @@
+.codebots/
+.venv/
+__pycache__/
+*.pyc
+dist/
+build/
+*.egg-info/
+.coverage
+.cache/
+.idea/
+.vscode/
